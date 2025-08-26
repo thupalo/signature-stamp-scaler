@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+import argparse
 from pathlib import Path
 from typing import Tuple
 
@@ -237,4 +238,30 @@ with gr.Blocks(title="Facsimile image generator", css=PAGE_CSS) as demo:
 
 
 if __name__ == '__main__':
-    demo.launch()
+    parser = argparse.ArgumentParser(description="Launch Gradio interface for signature stamp scaler")
+    parser.add_argument("--host", default="0.0.0.0", 
+                       help="Host to bind to (default: 0.0.0.0 for all interfaces)")
+    parser.add_argument("--port", type=int, default=7860, 
+                       help="Port to bind to (default: 7860)")
+    parser.add_argument("--share", action="store_true", 
+                       help="Create a public Gradio share link")
+    parser.add_argument("--local", action="store_true", 
+                       help="Run in local mode only (127.0.0.1)")
+    
+    args = parser.parse_args()
+    
+    # Determine host based on arguments
+    host = "127.0.0.1" if args.local else args.host
+    
+    print(f"Starting Gradio interface...")
+    print(f"Local URL: http://127.0.0.1:{args.port}")
+    if not args.local:
+        print(f"Network URL: http://{host}:{args.port}")
+        print("Note: Make sure your firewall allows connections on this port")
+    
+    # Launch with network access enabled
+    demo.launch(
+        server_name=host,       # Listen on specified host
+        server_port=args.port,  # Port number
+        share=args.share        # Public share link if requested
+    )

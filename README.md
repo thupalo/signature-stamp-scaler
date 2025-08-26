@@ -30,9 +30,37 @@ pip install -r requirements.txt
 ## Usage
 
 ### Web Interface (Gradio)
+
+**Local Access Only:**
+```bash
+python ruler_gradio.py --local
+```
+
+**Network Access (accessible from other computers):**
 ```bash
 python ruler_gradio.py
 ```
+
+**Custom Host and Port:**
+```bash
+python ruler_gradio.py --host 192.168.1.100 --port 8080
+```
+
+**Public Share Link (via Gradio's tunneling service):**
+```bash
+python ruler_gradio.py --share
+```
+
+**Web Interface Options:**
+- `--host` - Specify host IP (default: 0.0.0.0 for all interfaces)
+- `--port` - Specify port number (default: 7860)
+- `--share` - Create public Gradio share link for internet access
+- `--local` - Run in local-only mode (127.0.0.1)
+
+**Accessing from Other Computers:**
+1. Find your computer's IP address: `ipconfig` (Windows) or `ifconfig` (Linux/Mac)
+2. Ensure Windows Firewall allows the port (default 7860)
+3. Other computers can access via: `http://YOUR_IP:7860`
 
 ### Command Line
 The command line interface processes images by detecting rulers, cropping the image, and saving it with the correct scale.
