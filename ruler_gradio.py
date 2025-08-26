@@ -260,8 +260,8 @@ with gr.Blocks(title="Facsimile image generator", css=PAGE_CSS) as demo:
             output_info = gr.Textbox(label='Info', interactive=False)
             
             # Custom download for original file without checkerboard
-            download_file = gr.File(label="Download Original PNG", visible=False)
             download_instruction = gr.Markdown("", visible=False)
+            download_file = gr.File(label="Download final PNG", visible=False)
 
             # state to hold the last generated output path
             last_output = gr.State('')
@@ -296,7 +296,7 @@ with gr.Blocks(title="Facsimile image generator", css=PAGE_CSS) as demo:
             preview_path = add_checkerboard_background(out_path)
             
             # Update download instruction text
-            download_text = "**<span style='color: green;'>✓ Processing complete!</span>** Download the original PNG file below (without checkerboard background):"
+            download_text = "**<span style='color: green;'>✓ Processing complete!</span>** Download the final PNG file below (without checkerboard background):"
             
             return (gr.update(value=preview_path), 
                    out_info, 
