@@ -6,8 +6,78 @@ from pathlib import Path
 from typing import Tuple
 
 import gradio as gr
+from PIL import Image, ImageDraw
+import numpy as np
 
 from ruler_01 import process
+
+
+def create_checkerboard_background(width: int, height: int, square_size: int = 20) -> Image.Image:
+    """
+    Create a light checkerboard pattern for transparency visualization.
+    
+    Args:
+        width: Image width
+        height: Image height
+        square_size: Size of each checkerboard square in pixels
+    
+    Returns:
+        PIL Image with checkerboard pattern
+    """
+    # Create checkerboard pattern
+    checkerboard = Image.new('RGB', (width, height), 'white')
+    draw = ImageDraw.Draw(checkerboard)
+    
+    # Light gray and white colors for subtle checkerboard
+    color1 = (240, 240, 240)  # Very light gray
+    color2 = (255, 255, 255)  # White
+    
+    for y in range(0, height, square_size):
+        for x in range(0, width, square_size):
+            # Alternate colors in checkerboard pattern
+            if (x // square_size + y // square_size) % 2 == 0:
+                color = color1
+            else:
+                color = color2
+            
+            draw.rectangle([x, y, x + square_size, y + square_size], fill=color)
+    
+    return checkerboard
+
+
+def add_checkerboard_background(image_path: str) -> str:
+    """
+    Add checkerboard background to an image to visualize transparency.
+    
+    Args:
+        image_path: Path to the input image
+    
+    Returns:
+        Path to the new image with checkerboard background
+    """
+    if not image_path or not os.path.exists(image_path):
+        return image_path
+    
+    try:
+        # Open the image
+        img = Image.open(image_path).convert('RGBA')
+        
+        # Create checkerboard background
+        checkerboard = create_checkerboard_background(img.width, img.height)
+        
+        # Composite the image over the checkerboard
+        result = Image.alpha_composite(checkerboard.convert('RGBA'), img)
+        
+        # Save to a new temporary file
+        temp_dir = Path(tempfile.gettempdir())
+        output_path = temp_dir / f"checkerboard_{Path(image_path).name}"
+        result.save(output_path, 'PNG')
+        
+        return str(output_path)
+    
+    except Exception as e:
+        print(f"Error adding checkerboard background: {e}")
+        return image_path
 
 
 def run_conversion(input_path: str, debug: bool) -> Tuple[dict, str, str]:
@@ -156,13 +226,13 @@ with gr.Blocks(title="Facsimile image generator", css=PAGE_CSS) as demo:
                 """Handle clicking on an example image"""
                 try:
                     if not path:
-                        return gr.update(value=None), '', gr.update(visible=False), gr.update(value=None), ''
+                        return gr.update(value=None), '', gr.update(visible=False), gr.update(value=None), '', gr.update(visible=False)
                     
                     name, info = get_file_info(path)
                     # Set the example as input and reset output
-                    return gr.update(value=path), info, gr.update(visible=False), gr.update(value=None), ''
+                    return gr.update(value=path), info, gr.update(visible=False), gr.update(value=None), '', gr.update(visible=False)
                 except Exception:
-                    return gr.update(value=None), '', gr.update(visible=False), gr.update(value=None), ''
+                    return gr.update(value=None), '', gr.update(visible=False), gr.update(value=None), '', gr.update(visible=False)
 
             def on_gallery_select(*selected):
                 # This function is no longer used - replaced with individual example button handlers
@@ -173,38 +243,35 @@ with gr.Blocks(title="Facsimile image generator", css=PAGE_CSS) as demo:
                 try:
                     if not image_path:
                         # clear info, hide download instruction, and reset output when input cleared
-                        return '', gr.update(visible=False), gr.update(value=None), ''
+                        return '', gr.update(visible=False), gr.update(value=None), '', gr.update(visible=False)
                     _, info = get_file_info(image_path)
                     # when input changes, hide download instruction and reset output
-                    return info, gr.update(visible=False), gr.update(value=None), ''
+                    return info, gr.update(visible=False), gr.update(value=None), '', gr.update(visible=False)
                 except Exception:
-                    return '', gr.update(visible=False), gr.update(value=None), ''
+                    return '', gr.update(visible=False), gr.update(value=None), '', gr.update(visible=False)
 
             # image_input.change will be wired later after download_button is declared
 
         with gr.Column():
             gr.Markdown('### Output')
             # constrain output preview to 400x400 and scale to fit (no scrollbars)
-            # show_download_button=True enables the built-in download button on the Image component
-            output_preview = gr.Image(label='Output (transparent)', width=400, height=400, show_download_button=True)
+            # Disable built-in download since we want to download the original without checkerboard
+            output_preview = gr.Image(label='Output (with transparency visualization)', width=400, height=400, show_download_button=False)
             output_info = gr.Textbox(label='Info', interactive=False)
             
-            # Download instruction text (initially hidden, shown after successful submit)
+            # Custom download for original file without checkerboard
+            download_file = gr.File(label="Download Original PNG", visible=False)
             download_instruction = gr.Markdown("", visible=False)
 
-            # Download button (starts disabled) - removed since we'll use built-in download
-            # download_button = gr.Button('Download output', interactive=False)
-            # Hidden file component for downloads
-            # download_output = gr.File(visible=False)
             # state to hold the last generated output path
             last_output = gr.State('')
 
             # wire example buttons to set input when clicked
             for btn, path in example_buttons:
-                btn.select(fn=lambda p=path: on_example_click(p), outputs=[input_preview, input_info, download_instruction, output_preview, output_info])
+                btn.select(fn=lambda p=path: on_example_click(p), outputs=[input_preview, input_info, download_instruction, output_preview, output_info, download_file])
             
             # wire input change handler
-            image_input.change(fn=on_image_change, inputs=[image_input], outputs=[input_info, download_instruction, output_preview, output_info])
+            image_input.change(fn=on_image_change, inputs=[image_input], outputs=[input_info, download_instruction, output_preview, output_info, download_file])
 
             gr.Markdown('### Debug')
             debug_area = gr.Textbox(label='Debug messages', interactive=False, lines=8)
@@ -224,15 +291,25 @@ with gr.Blocks(title="Facsimile image generator", css=PAGE_CSS) as demo:
                 for k, v in debug_msgs.items():
                     if v:
                         dbg_text += f"{k}: {v}\n"
-            # do not change input preview/info on submit (they remain the same)
-            # show download instruction after successful submit
-            download_text = "**<span style='color: blue;'> To download output file, click the download icon (\u2913) in the top-right corner of the output preview above</span>**"
-            return gr.update(value=str(out_path)), out_info, dbg_text, gr.update(value=download_text, visible=True)
+            
+            # Create version with checkerboard background for preview
+            preview_path = add_checkerboard_background(out_path)
+            
+            # Update download instruction text
+            download_text = "**<span style='color: green;'>✓ Processing complete!</span>** Download the original PNG file below (without checkerboard background):"
+            
+            return (gr.update(value=preview_path), 
+                   out_info, 
+                   dbg_text, 
+                   gr.update(value=download_text, visible=True),
+                   gr.update(value=out_path, visible=True))
         except Exception as e:
             # match outputs and hide download instruction on error
-            return None, '', f'Error: {e}', gr.update(visible=False)
-    # submit updates the output preview, output info, debug area, and download instruction
-    submit.click(fn=on_submit, inputs=[image_input, debug_checkbox], outputs=[output_preview, output_info, debug_area, download_instruction])
+            return None, '', f'Error: {e}', gr.update(visible=False), gr.update(visible=False)
+    
+    # submit updates the output preview, output info, debug area, download instruction, and download file
+    submit.click(fn=on_submit, inputs=[image_input, debug_checkbox], 
+                outputs=[output_preview, output_info, debug_area, download_instruction, download_file])
 
     # Removed custom download button - using built-in Image component download functionality
 
