@@ -1,13 +1,14 @@
-#%%
+## %%
 import os
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import argparse
 
 SMALL_WIDTH = 300
 DEBUG = False
 
-#%%
+### %%
 # calculate fourier transformation by rows using window size 512 and overlap 256
 def calculate_fourier_transform(image, window_size=512, overlap=256):
     # Convert image to grayscale
@@ -60,10 +61,6 @@ def find_ruler(image, horizontal=True):
     f = (f1 + f2/2 + f3/3 + f4/4 + f5/5) / 5
     std_err = np.std([f1, f2/2, f3/3, f4/4, f5/5])
 
-    if DEBUG:
-        result = (f, std_err, y, f1, f2, f3, f4, f5)
-        print("FFT result:", result)
-
     return {"f": f, "std_err": std_err, "y": y}
 
 #%%
@@ -71,10 +68,11 @@ def detect_rulers_and_crop(pimage):
 
     h_ruler = find_ruler(pimage, horizontal=True)
     if DEBUG:
-        print("Horizontal ruler frequency:", h_ruler)
+        print("Horizontal ruler data:", h_ruler)
     v_ruler = find_ruler(pimage, horizontal=False)
     if DEBUG:
-        print("Vertical ruler frequency:", v_ruler)
+        print("Vertical ruler data:", v_ruler)
+
     image = pimage
     h_scale = None
     v_scale = None
@@ -93,9 +91,16 @@ def detect_rulers_and_crop(pimage):
     if v_scale is None and h_scale is not None:
         v_scale = h_scale
 
+    if DEBUG:
+        print("Image size after cropping:", image.shape)
+        print("Horizontal scale (pix/mm):", h_scale)
+        print("Vertical scale (pix/mm):", v_scale)
+        cv2.imwrite("debug_info_1.png", image)
+        print("Cropped image saved as debug_info_1.png")
+
     return image, (h_scale, v_scale)
 
-# %%
+## %%
 def crop_to_content(img1):
 
     global SMALL_WIDTH
@@ -108,7 +113,7 @@ def crop_to_content(img1):
     # Otsu's thresholding
     _,img = cv2.threshold(img,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
     
-    kernel = np.ones((15,15),np.uint8)
+    kernel = np.ones((9,9),np.uint8)
     img = cv2.erode(img, kernel, iterations=1)
     img = ~img 
 
@@ -142,9 +147,14 @@ def crop_to_content(img1):
         top = int(top * img1.shape[0] / SMALL_HEIGHT)
         right = int(right * img1.shape[1] / SMALL_WIDTH)
         bottom = int(bottom * img1.shape[0] / SMALL_HEIGHT)
-        print("Bounding box:", (left, top, right, bottom))
+
         # crop img1
         img2 = img1[top:bottom, left:right]
+        if DEBUG:
+            print("Bounding box:", (left, top, right, bottom))
+            cv2.imwrite("debug_info_2.png", img2)
+            print("Cropped image saved as debug_info_2.png")
+
         return img2
 
 
@@ -173,13 +183,12 @@ def finalize(img2, h_scale, v_scale, output_path):
     img_pil = Image.fromarray(img_rgba)
     img_pil.save(output_path, dpi=(300,300))
     if DEBUG:
-        print("Final image size (with scale):", img_rgba.shape)
+        print("Final image shape (with scale):", img_rgba.shape)
 
-# %%
+## %%
+
 def process(input_path, output_path):
 
-    global DEBUG
-    DEBUG = False
     image = cv2.imread(input_path)
     img1, (h_scale, v_scale) = detect_rulers_and_crop(image)
     img2 = crop_to_content(img1)
@@ -187,13 +196,53 @@ def process(input_path, output_path):
     image = cv2.imread(input_path)
     img1, (h_scale, v_scale) = detect_rulers_and_crop(image)
     img2 = crop_to_content(img1)
-    finalize(img2, h_scale, v_scale, output_path)
+    finalize(img2, h_scale, v_scale, output_path=output_path)
+
+
+def main(input_path, output_path, overwrite=False):
+
+    if not os.path.exists(input_path):
+        print("Input file does not exist.")
+        return
     
+    if os.path.exists(output_path) and not overwrite:
+        # ask user if they want to overwrite
+        response = input(f"Output file {output_path} already exists. Overwrite? (y/n): ")
+        if response.lower() != 'y':
+            print("Operation cancelled.")
+            return
+        
+    process(input_path, output_path)
+
     # check output
     if os.path.exists(output_path):
         print("Output image saved to:", output_path)
-    else:
-        print("Failed to read output image.")
-# %%
+
+## %%
 if __name__ == "__main__":
-    process("image.jpg", "output.png")
+    parser = argparse.ArgumentParser(description="Detect ruler, crop and save image with correct scale.")
+    parser.add_argument("input_path", help="Path to input image (jpeg or png).")
+    parser.add_argument("output_path", help="Path to output PNG file.")
+    # primary correct flag is --debug; keep --debig as an alias for backward compatibility
+    parser.add_argument("-d" , "--debug", dest="debug", action="store_true",
+                        help="Enable debug output (sets DEBUG=True).")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite output file if it exists without prompting.")
+    args = parser.parse_args()
+
+    # set debug flag
+    DEBUG = args.debug
+
+    # Validate input extension
+    in_ext = os.path.splitext(args.input_path)[1].lower()
+    if in_ext not in ('.png', '.jpg', '.jpeg'):
+        print("Input file extension not supported. Use .jpg, .jpeg or .png.")
+        raise SystemExit(1)
+
+    out_path = args.output_path
+    # Ensure output is PNG (user requested check for '.png' in output_path)
+    if not out_path.lower().endswith('.png'):
+        print("Output path does not end with '.png'. Appending '.png' to output path.")
+        out_path = out_path + '.png'
+
+    main(args.input_path, out_path, overwrite=args.overwrite)
+## %%
