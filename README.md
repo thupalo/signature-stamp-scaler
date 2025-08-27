@@ -1,6 +1,6 @@
 # Signature Stamp Scaler
 
-**Transform any mobile phone photo of a signature or stamp into a professional, properly scaled image with transparent background.** Simply include a ruler in your photo, and this application automatically detects it to ensure precise scaling while removing the background for immediate use in documents and digital workflows. Perfect for digitizing physical signatures and stamps without expensive scanning equipment.
+**Transform any mobile phone photo of a signature or stamp into a professional, properly scaled image with transparent background.** Simply include a ruler in your photo, and this application automatically detects it to ensure precise scaling while removing the background for immediate use in documents and digital workflows. 
 
 ![Web Interface](screenshots/web_interface.png)
 
