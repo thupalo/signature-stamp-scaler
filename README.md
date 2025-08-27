@@ -2,6 +2,10 @@
 
 A Python application for processing and scaling signatures/stamps in images using computer vision techniques.
 
+![Web Interface](screenshots/web_interface.png)
+
+*The web interface showing the main concept: upload an image with a signature/stamp and ruler, get a processed output with transparent background and proper scaling.*
+
 ## Features
 
 - Image processing with ruler detection for scaling
